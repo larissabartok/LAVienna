@@ -1,4 +1,4 @@
-##' Visualiserung für Regressionsmodelle
+##' Visualisation of (standardised) regression coefficients in regression models
 #'
 #' Diese Funktion erstellt eine ggplot2-Grafik, in der die Regressionskoeffizienten (standardisiert oder nicht standardisiert) aufgetragen werden.
 #' @param lm Objekt der Klasse lm oder glm
@@ -8,6 +8,7 @@
 #' @param pfad Pfadangabe wo die Grafik gespeichert werden soll. Default ist "U:/Learning Analytics Projekt/09 Grafiken/"
 #' @param file Pfad zum File, das Variablenbeschriftungen enthält
 #' @param alpha Für Konfidenzintervalle und Signifikanz. Default ist 0.05
+#' @param addintercept Soll Intercept hinzugefügt werden? Default ist FALSE
 #' @param xlim Limits der x-Achse. Default ist c(-0.6, 0.6)
 #' @param kasten Soll der Kasten dargestellt werden? Default ist TRUE
 #' @param kastencoord x-Koordinaten für den Kasten
@@ -16,56 +17,52 @@
 #' @export betaplot
 #' @examples betaplot()
 
-betaplot <- function(lm, lmz = NULL, standardisieren = TRUE, speichern = FALSE, pfad = NULL, file = NULL, alpha = 0.05, xlim = c(-0.6, 0.6), kasten = TRUE, kastencoord = c(-0.25, 0.235), englisch = FALSE, bw = FALSE){
+betaplot <- function(lm, lmz = NULL, standardisieren = TRUE, speichern = FALSE, pfad = NULL, file = NULL, alpha = 0.05, addintercept = FALSE, xlim = c(-0.6, 0.6), kasten = TRUE, kastencoord = c(-0.25, 0.235), englisch = FALSE, bw = FALSE){
   
-  # Hier werden Daten aufbereitet, später eigene Hilfsfunktion
+  # Find z
+  z <- findez(alpha = alpha)
   
-  z <- qnorm(p= 1- (alpha/2), mean=0, sd=1)
   
+  # Define colours significance
   if(bw){
     sig_col <- c("gray30","gray70")
   }else{
     sig_col <- c("cadetblue2","firebrick3")
   }
   
-  if(standardisieren){ # wenn logistische Regression dann Odds berechnen später hinzu ---------------
+  # standardised regression coefficients
+  if(standardisieren){ 
     
     # Das hier produziert blöde Warnmeldung und nicht möglich mit Umlauten in Faktor levels???
-    lm2 <- beta.lm(model = lm)
-    # lm2 <- reghelper::beta(model = lm)
+    # lm2 <- beta.lm(model = lm)
+    lm2 <- reghelper::beta(model = lm)
     
-    # FÜR GLM
-    if(any(class(lm2) == "summary.glm")){
       lm_data <- as.data.frame(broom::tidy(lm))
       hilfe <- as.data.frame(lm2$coefficients)
       lm_data$estimate <- hilfe$Estimate
       lm_data$std.error <- hilfe$`Std. Error`
       lm_data$statistic <- hilfe$`z value`
+      
+      # LM or GLM
       if(is.null(hilfe$`Pr(>|z|)`)){
         lm_data$p.value <- hilfe$`Pr(>|t|)`
       }else{
         lm_data$p.value <- hilfe$`Pr(>|z|)`
       }
-    }
-    # FÜR LM
-    if(any(class(lm2) == "summary.lm")){
-      lm_data <- as.data.frame(broom::tidy(lm))
-      hilfe <- as.data.frame(lm2$coefficients)
-      lm_data$estimate <- hilfe$Estimate
-      lm_data$std.error <- hilfe$`Std. Error`
-      lm_data$statistic <- hilfe$`z value`
-      lm_data$p.value <- hilfe$`Pr(>|t|)`
-    }
+  
+    # Conficence interval
     lm_data$lower <- lm_data$estimate - z * lm_data$std.error
     lm_data$upper <- lm_data$estimate + z * lm_data$std.error
-  } else{
+  } else{ # unstandardised regression coefficients
     lm_data <- as.data.frame(broom::tidy(lm))
     lm_data$lower <- lm_data$estimate - z * lm_data$std.error
     lm_data$upper <- lm_data$estimate + z * lm_data$std.error
   }
   
-  # Remove intercept xxx hier noch Option mit Intercept in Grafik
-  lm_data <- lm_data[-1,]
+  # Remove intercept (if default was not changed)
+  if(!addintercept){
+    lm_data <- lm_data[-1,] 
+  }
   
   # Datensatz der Benennung der Variablen angibt
   # Hier gibt es jetzt die Funktion namenplot die das übernimmt
@@ -103,13 +100,11 @@ betaplot <- function(lm, lmz = NULL, standardisieren = TRUE, speichern = FALSE, 
   
   if(!is.null(lmz)){ # 2. Modell
     
-    if(standardisieren){ # wenn logistische Regression dann Odds berechnen später hinzu ---------------
+    if(standardisieren){ 
       
       # Das hier produziert blöde Warnmeldung und nicht möglich mit Umlauten in Faktor levels???
       lm3 <- reghelper::beta(model = lmz)
       
-      # FÜR GLM
-      if(any(class(lm3) == "summary.glm")){
         lm3_data <- as.data.frame(broom::tidy(lmz))
         hilfe3 <- as.data.frame(lm3$coefficients)
         lm3_data$estimate <- hilfe3$Estimate
@@ -120,26 +115,19 @@ betaplot <- function(lm, lmz = NULL, standardisieren = TRUE, speichern = FALSE, 
         }else{
           lm3_data$p.value <- hilfe3$`Pr(>|z|)`
         }
-      }
-      # FÜR LM
-      if(any(class(lm3) == "summary.lm")){
-        lm3_data <- as.data.frame(broom::tidy(lmz))
-        hilfe3 <- as.data.frame(lm3$coefficients)
-        lm3_data$estimate <- hilfe3$Estimate
-        lm3_data$std.error <- hilfe3$`Std. Error`
-        lm3_data$statistic <- hilfe3$`z value`
-        lm3_data$p.value <- hilfe3$`Pr(>|t|)`
-      }
+
       lm3_data$lower <- lm3_data$estimate - z * lm3_data$std.error
       lm3_data$upper <- lm3_data$estimate + z * lm3_data$std.error
-    } else{
+    } else{ # unstandardised
       lm3_data <- as.data.frame(broom::tidy(lmz))
       lm3_data$lower <- lm3_data$estimate - z * lm3_data$std.error
       lm3_data$upper <- lm3_data$estimate + z * lm3_data$std.error
     }
     
-    # Remove intercept xxx hier noch Option mit Intercept in Grafik
-    lm3_data <- lm3_data[-1,]
+    # Remove intercept
+    if(!addintercept){
+      lm3_data <- lm3_data[-1,] 
+    }
     
     # Datensatz der Benennung der Variablen angibt
     # Hier gibt es jetzt die Funktion namenplot die das übernimmt
